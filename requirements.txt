@@ -1,0 +1,26 @@
+# Production dependencies for Product OCR API
+
+# Core FastAPI framework
+fastapi==0.117.1
+uvicorn[standard]==0.37.0
+
+# Pydantic for data validation and settings
+pydantic==2.10.4
+pydantic-settings==2.7.0
+
+# Google Gemini AI integration
+langchain-google-genai==2.0.7
+langchain-core==0.3.28
+
+# HTTP client for database API
+requests==2.32.3
+urllib3==2.3.0
+
+# Environment variable management
+python-dotenv==1.0.1
+
+# File upload handling
+python-multipart==0.0.20
+
+# Additional utilities
+typing-extensions==4.12.2

@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  product-ocr-api:
+    build: .
+    container_name: product-ocr-api
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    volumes:
+      - ./app:/app/app:ro  # Read-only mount for production
+
+networks:
+  default:
+    driver: bridge
