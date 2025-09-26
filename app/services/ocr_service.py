@@ -145,10 +145,11 @@ def lookup_product_by_sku(sku: str) -> dict:
     return None
 
 
-def generate_variant_sku(base_sku: str) -> str:
-    """Generate a variant SKU by adding space and 4 random digits"""
-    random_suffix = ''.join(random.choices(string.digits, k=4))
-    return f"{base_sku} {random_suffix}"
+def generate_variant_sku(base_sku: str, secondary_color: str) -> str:
+    """Generate a variant SKU by adding space and secondary color"""
+    # Clean the secondary color to make it SKU-friendly
+    clean_color = secondary_color.strip().replace(' ', '_')
+    return f"{base_sku} {clean_color}"
 
 
 def normalize_color(color: str) -> str:
@@ -164,25 +165,50 @@ def save_product_to_db(product: Product) -> dict:
     original_sku = product.sku
     final_sku = original_sku
 
-    # Check if product with this SKU already exists
-    existing_product = lookup_product_by_sku(original_sku)
+    # Normalize colors for comparison
+    new_primary_color_norm = normalize_color(product.primary_color)
 
-    if existing_product:
-        # Product with this SKU exists - check if colors match
-        existing_color = normalize_color(existing_product.get('color', ''))
-        new_color = normalize_color(product.primary_color)
+    # First, check if base SKU exists
+    base_product = lookup_product_by_sku(original_sku)
 
-        if existing_color == new_color:
+    if base_product:
+        base_color_norm = normalize_color(base_product.get('color', ''))
+
+        if base_color_norm == new_primary_color_norm:
             # Same SKU, same color - it's a duplicate
             return {
                 "status": "duplicate",
                 "sku": original_sku,
                 "error": f"Product already exists in database with SKU {original_sku} and color {product.primary_color}"
             }
-        else:
-            # Same SKU, different color - create a variant
-            final_sku = generate_variant_sku(original_sku)
-            variant_message = f"Created variant SKU {final_sku} for {original_sku} with color {product.primary_color}"
+
+    # If base SKU exists with different color OR doesn't exist, check variant SKU
+    # Use secondary_color if available, otherwise use primary_color
+    color_suffix = product.secondary_color if hasattr(product, 'secondary_color') and product.secondary_color else product.primary_color
+    variant_sku = generate_variant_sku(original_sku, color_suffix)
+
+    # Check if this variant SKU already exists
+    variant_product = lookup_product_by_sku(variant_sku)
+
+    if variant_product:
+        variant_color_norm = normalize_color(variant_product.get('color', ''))
+        if variant_color_norm == new_primary_color_norm:
+            # Variant with same color already exists
+            return {
+                "status": "duplicate",
+                "sku": variant_sku,
+                "error": f"Product variant already exists with SKU {variant_sku} and color {product.primary_color}"
+            }
+
+    # Determine final SKU to use
+    if base_product:
+        # Base SKU exists with different color, use variant SKU
+        final_sku = variant_sku
+        variant_message = f"Created variant SKU {final_sku} for {original_sku} with {color_suffix}"
+    else:
+        # Base SKU doesn't exist, use original SKU
+        final_sku = original_sku
+        variant_message = None
 
     payload = {
         "name": product.name.replace('\n', ' '),
@@ -215,7 +241,7 @@ def save_product_to_db(product: Product) -> dict:
         }
 
         # Add variant info if applicable
-        if final_sku != original_sku:
+        if variant_message:
             result["variant_info"] = variant_message
             result["original_sku"] = original_sku
 
