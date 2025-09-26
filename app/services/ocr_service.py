@@ -214,6 +214,8 @@ def save_product_to_db(product: Product) -> dict:
         "name": product.name.replace('\n', ' '),
         "sku": final_sku,
         "color": product.primary_color,
+        "in_db": True,
+        "type": "sku",
         "pricing": {
             "price": price_value,
             "regular_price": price_value
