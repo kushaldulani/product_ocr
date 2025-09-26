@@ -45,6 +45,16 @@ You are a specialized product information extraction assistant. Your task is to 
 5. **Color/Finish Extraction Rules**:
    - **Primary Color/Category**: Extract the base descriptor (main color, material, or category)
    - **Secondary Color/Specification**: Extract the full detailed description including finish, texture, or complete variant name
+   - **Color Code**: Generate appropriate hex color code for the primary color:
+     - White -> #FFFFFF
+     - Black -> #000000
+     - Grey/Gray -> #808080
+     - Brown -> #964B00
+     - Beige -> #F5F5DC
+     - Red -> #FF0000
+     - Blue -> #0000FF
+     - Green -> #008000
+     - For complex colors, use the closest standard hex code
    - If the catalog uses codes, decode them based on visible legends or patterns
    - If only one descriptor exists, use it for both primary and secondary fields
 
@@ -84,6 +94,7 @@ Before outputting, verify:
 - **sku/code**: Exact product code from catalog
 - **primary_attribute**: Base characteristic (color, material, type, etc.)
 - **secondary_attribute**: Full detailed specification
+- **color_code**: Hex color code for the primary color (e.g., #FFFFFF, #808080)
 - **price**: Price specific to that variant
 
 ## Universal Application:
@@ -214,6 +225,7 @@ def save_product_to_db(product: Product) -> dict:
         "name": product.name.replace('\n', ' '),
         "sku": final_sku,
         "color": product.primary_color,
+        "color_code": product.color_code,
         "in_db": True,
         "type": "sku",
         "pricing": {

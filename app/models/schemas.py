@@ -7,6 +7,7 @@ class Product(BaseModel):
     sku: str = Field(description="Product SKU/Code exactly as shown")
     primary_color: str = Field(description="Base color only (White, Grey, Beige, Black, etc.)")
     secondary_color: str = Field(description="Full finish/color description (White Matte, Grey Matte, Beige Tekno, etc.)")
+    color_code: str = Field(description="Hex color code for the primary color (e.g., #FFFFFF for white, #808080 for grey)")
     price: str = Field(description="Product price with currency symbol")
 
 
@@ -19,6 +20,7 @@ class ProductResponse(BaseModel):
     sku: str
     primary_color: str
     secondary_color: str
+    color_code: str
     price: str
 
 
