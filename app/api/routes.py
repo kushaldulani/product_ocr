@@ -71,7 +71,7 @@ async def process_catalog_image(file: UploadFile = File(...)):
                 message_parts.append(f"{error_count} failed")
 
             message = "Successfully " + ", ".join(message_parts) + "."
-            success = True if (success_count > 0 or duplicate_count > 0) else False
+            success = True if success_count > 0 else False
 
         return OCRResponse(
             success=success,
