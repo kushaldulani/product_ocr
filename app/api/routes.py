@@ -28,29 +28,50 @@ async def process_catalog_image(file: UploadFile = File(...)):
 
         # Save to database
         save_results = []
+        success_count = 0
+        duplicate_count = 0
+        variant_count = 0
+
         for product in result.products:
             save_result = save_product_to_db(product)
+
+            # Track different statuses
+            if save_result["status"] == "success":
+                success_count += 1
+                if save_result.get("variant_info"):
+                    variant_count += 1
+            elif save_result["status"] == "duplicate":
+                duplicate_count += 1
+
             save_results.append(ProcessingResult(
                 status=save_result["status"],
-                sku=save_result["sku"],
-                error=save_result.get("error")
+                sku=save_result.get("sku", product.sku),
+                error=save_result.get("error") or save_result.get("variant_info")
             ))
-
-        success_count = sum(1 for r in save_results if r.status == "success")
 
         # Generate user-friendly messages
         if len(products) == 0:
             message = "No highlighted products found in the image. Please ensure products are clearly marked with circles, arrows, or other visual indicators."
             success = False
-        elif success_count == 0:
-            message = f"Successfully identified {len(products)} product{'s' if len(products) != 1 else ''} from the catalog, but encountered database issues while saving. All products may already exist or there are connectivity problems."
-            success = True
-        elif success_count == len(products):
-            message = f"Perfect! Successfully identified and saved {len(products)} product{'s' if len(products) != 1 else ''} to the database."
-            success = True
         else:
-            message = f"Successfully identified {len(products)} product{'s' if len(products) != 1 else ''} from the catalog and saved {success_count} to the database. {len(products) - success_count} product{'s' if (len(products) - success_count) != 1 else ''} may already exist in the database."
-            success = True
+            message_parts = []
+            message_parts.append(f"Identified {len(products)} product{'s' if len(products) != 1 else ''} from the catalog")
+
+            if success_count > 0:
+                if variant_count > 0:
+                    message_parts.append(f"saved {success_count} ({variant_count} as variant{'s' if variant_count != 1 else ''})")
+                else:
+                    message_parts.append(f"saved {success_count}")
+
+            if duplicate_count > 0:
+                message_parts.append(f"{duplicate_count} already exist{'s' if duplicate_count == 1 else ''} in database")
+
+            error_count = len(products) - success_count - duplicate_count
+            if error_count > 0:
+                message_parts.append(f"{error_count} failed")
+
+            message = "Successfully " + ", ".join(message_parts) + "."
+            success = True if (success_count > 0 or duplicate_count > 0) else False
 
         return OCRResponse(
             success=success,

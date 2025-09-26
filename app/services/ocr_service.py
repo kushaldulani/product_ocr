@@ -1,5 +1,7 @@
 import base64
 import requests
+import random
+import string
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage
 from app.core.config import settings
@@ -126,13 +128,65 @@ def parse_price(price_str: str) -> float:
         return 0.0
 
 
+def lookup_product_by_sku(sku: str) -> dict:
+    """Lookup existing product by SKU"""
+    try:
+        response = requests.get(
+            f"http://35.182.153.121:5001/api/products/sku/{sku}",
+            headers={'accept': 'application/json'},
+            timeout=settings.database_timeout
+        )
+        if response.status_code == 200:
+            result = response.json()
+            if result.get('success') and result.get('data'):
+                return result['data']
+    except:
+        pass
+    return None
+
+
+def generate_variant_sku(base_sku: str) -> str:
+    """Generate a variant SKU by adding space and 4 random digits"""
+    random_suffix = ''.join(random.choices(string.digits, k=4))
+    return f"{base_sku} {random_suffix}"
+
+
+def normalize_color(color: str) -> str:
+    """Normalize color string for comparison"""
+    if not color:
+        return ""
+    return color.strip().lower().replace(' ', '').replace('-', '').replace('_', '')
+
+
 def save_product_to_db(product: Product) -> dict:
-    """Save a single product to the database via API"""
+    """Save a single product to the database via API with duplicate/variant handling"""
     price_value = parse_price(product.price)
+    original_sku = product.sku
+    final_sku = original_sku
+
+    # Check if product with this SKU already exists
+    existing_product = lookup_product_by_sku(original_sku)
+
+    if existing_product:
+        # Product with this SKU exists - check if colors match
+        existing_color = normalize_color(existing_product.get('color', ''))
+        new_color = normalize_color(product.primary_color)
+
+        if existing_color == new_color:
+            # Same SKU, same color - it's a duplicate
+            return {
+                "status": "duplicate",
+                "sku": original_sku,
+                "error": f"Product already exists in database with SKU {original_sku} and color {product.primary_color}"
+            }
+        else:
+            # Same SKU, different color - create a variant
+            final_sku = generate_variant_sku(original_sku)
+            variant_message = f"Created variant SKU {final_sku} for {original_sku} with color {product.primary_color}"
 
     payload = {
         "name": product.name.replace('\n', ' '),
-        "sku": product.sku,
+        "sku": final_sku,
         "color": product.primary_color,
         "pricing": {
             "price": price_value,
@@ -153,15 +207,25 @@ def save_product_to_db(product: Product) -> dict:
             timeout=settings.database_timeout
         )
         response.raise_for_status()
-        return {
+
+        result = {
             "status": "success",
-            "sku": product.sku,
+            "sku": final_sku,
             "response": response.json()
         }
+
+        # Add variant info if applicable
+        if final_sku != original_sku:
+            result["variant_info"] = variant_message
+            result["original_sku"] = original_sku
+
+        return result
+
     except requests.exceptions.RequestException as e:
         return {
             "status": "error",
-            "sku": product.sku,
+            "sku": final_sku,
+            "original_sku": original_sku if final_sku != original_sku else None,
             "error": str(e),
             "response": response.text if 'response' in locals() else None
         }
